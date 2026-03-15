@@ -26,6 +26,7 @@ services:
       - DB_NAME=uth_bot
       - DB_USER= <admin>
       - DB_PASS= <your_strong_password>
+      - ENCRYPTION_KEY= <your_KEY>
 
 volumes:
   postgres_data:

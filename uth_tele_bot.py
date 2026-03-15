@@ -10,6 +10,7 @@ import schedule
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet
 
 load_dotenv()
 
@@ -20,11 +21,17 @@ dbConfig = {
     "password": os.getenv("DB_PASS")
 }
 
-teleToken = os.getenv("TELE_TOKEN")
-adminId = os.getenv("ADMIN_ID")
-
 def getNow(): return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 def log(level, message): print(f"[{getNow()}] [{level}] {message}", flush=True)
+
+teleToken = os.getenv("TELE_TOKEN")
+adminId = os.getenv("ADMIN_ID")
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+cipher_suite = Fernet(ENCRYPTION_KEY.encode())
+if not ENCRYPTION_KEY:
+    log("CRITICAL", "Thiếu ENCRYPTION_KEY!")
+    exit(1)
+
 
 apihelper.CONNECT_TIMEOUT = 60
 apihelper.READ_TIMEOUT = 60
@@ -84,6 +91,14 @@ def getClassesByDate(user, password, targetDate):
         return [c for c in res.json().get("body", []) if c.get("thu") == thu]
     except: return None
 
+def encryptData(data):
+    if not data: return None
+    return cipher_suite.encrypt(data.encode()).decode()
+
+def decryptData(encryptedData):
+    if not encryptedData: return None
+    return cipher_suite.decrypt(encryptedData.encode()).decode()
+
 
 def setBotCommands():
     try:
@@ -137,12 +152,17 @@ def processMssvStep(message):
 
 def processPasswordStep(message, userData):
     pwd = message.text
+    encrypted_mssv = encryptData(userData['mssv'])
+    encrypted_pwd = encryptData(pwd)
     log("ACTION", f"Đang xác thực tài khoản cho User {message.chat.id} (MSSV: {userData['mssv']})")
     bot.send_message(message.chat.id, "⏳ Đang xác thực thông tin, bạn đợi mình xíu nha...")
     isValid, reason = verifyUthCredentials(userData['mssv'], pwd)
     if isValid:
         conn = getDbConn(); cur = conn.cursor()
-        cur.execute("INSERT INTO users (chat_id, uth_user, uth_pass) VALUES (%s, %s, %s) ON CONFLICT (chat_id) DO UPDATE SET uth_user = EXCLUDED.uth_user, uth_pass = EXCLUDED.uth_pass", (str(message.chat.id), userData['mssv'], pwd))
+        cur.execute(
+            "INSERT INTO users (chat_id, uth_user, uth_pass) VALUES (%s, %s, %s) ON CONFLICT (chat_id) DO UPDATE SET uth_user = EXCLUDED.uth_user, uth_pass = EXCLUDED.uth_pass",
+            (str(message.chat.id), encrypted_mssv, encrypted_pwd)
+            )
         conn.commit(); cur.close(); conn.close()
         log("SUCCESS", f"User {message.chat.id} đã đăng ký thành công")
         bot.send_message(message.chat.id, "🎉 <b>Đăng ký thành công!</b> Mình sẽ tự động nhắc lịch cho bạn.", reply_markup=mainMenu(message.chat.id), parse_mode="HTML")
@@ -165,8 +185,11 @@ def processManual(chatId, dateStr, isAuto=False):
             if not isAuto:
                 bot.send_message(chatId, "Bạn chưa đăng ký tài khoản!", reply_markup=mainMenu(chatId))
             return
+        
+        rawUser = decryptData(u[0])
+        rawPass = decryptData(u[1])
 
-        classes = getClassesByDate(u[0], u[1], dateStr)
+        classes = getClassesByDate(rawUser, rawPass, dateStr)
         if classes:
             header = f"🔔 <b>NHẮC LỊCH TỰ ĐỘNG ({dateStr})</b>\n" if isAuto else f"📅 <b>LỊCH HỌC {dateStr}</b>\n"
             msg = header + "━━━━━━━━━━━━━━━━━━\n"
@@ -361,8 +384,11 @@ def handleCheckStatus(message):
             bot.edit_message_text("❌ Hình như bạn chưa đăng ký tài khoản. Hãy đăng ký để mình hỗ trợ tốt hơn nhé!", chatId, msgWait.message_id)
             return
 
+        raw_user = decryptData(u[0])
+        raw_pass = decryptData(u[1])
+
         startTime = time.time()
-        isValid, reason = verifyUthCredentials(u[0], u[1])
+        isValid, reason = verifyUthCredentials(raw_user, raw_pass)
         latency = round((time.time() - startTime) * 1000)
 
         apiStatus = "✅ Hoạt động tốt" if isValid else f"❌ Có lỗi ({reason})"
