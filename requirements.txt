@@ -1,5 +1,9 @@
-pyTelegramBotAPI
-requests
-psycopg2-binary
-python-dotenv
-schedule
+certifi==2026.2.25
+charset-normalizer==3.4.5
+idna==3.11
+psycopg2-binary==2.9.11
+pyTelegramBotAPI==4.32.0
+python-dotenv==1.2.2
+requests==2.32.5
+schedule==1.2.2
+urllib3==2.6.3

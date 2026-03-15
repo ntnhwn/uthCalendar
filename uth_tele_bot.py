@@ -116,8 +116,23 @@ def setBotCommands():
 # start msg
 @bot.message_handler(commands=['start', 'help'])
 def welcome(message):
-    log("INFO", f"User {message.chat.id} vừa nhấn /start")
-    bot.reply_to(message, "Chào bạn! Mình là Bot nhắc lịch UTH. Chọn nút bên dưới để bắt đầu nhé.", reply_markup=mainMenu(message.chat.id))
+    log("INFO", f"User {message.chat.id} vừa nhấn {message.text}")
+    
+    welcomeText = (
+        "👋 **Chào bạn! Mình là Bot nhắc lịch UTH.**\n\n"
+        "Mình sẽ giúp bạn theo dõi lịch học và lấy link phòng học Online một cách nhanh chóng nhất.\n\n"
+        "📢 **Tham gia nhóm hỗ trợ và cập nhật tin tức tại:**\n"
+        "👉 https://t.me/UTH_Calendar\n\n"
+        "Bạn hãy chọn các nút ở menu bên dưới để bắt đầu sử dụng nhé!"
+    )
+    
+    bot.reply_to(
+        message, 
+        welcomeText, 
+        parse_mode="Markdown", 
+        reply_markup=mainMenu(message.chat.id),
+        disable_web_page_preview=False
+    )
 
 # login
 @bot.message_handler(commands=['login'])
