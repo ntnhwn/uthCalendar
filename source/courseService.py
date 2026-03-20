@@ -89,6 +89,24 @@ def scanAllDeadlines(bot, chatId, isManual=False):
     events = getEventsViaAjax(session, sesskey)
     completedIds = db.getCompletedTaskIds(chatId)
 
+    if not events:
+        if isManual:
+            bot.send_message(chatId, "🎉 <b>Tuyệt vời!</b>\nBạn không có deadline nào trong 7 ngày tới. Nghỉ ngơi thôi!", parse_mode="HTML")
+        return True
+
+    # Gửi tin nhắn Header trước khi liệt kê
+    now_str = datetime.now().strftime('%H:%M - %d/%m/%Y')
+    if isManual:
+        header = f"🔍 <b>DANH SÁCH DEADLINE MỚI NHẤT</b>\n"
+    else:
+        header = f"🚀 <b>THÔNG BÁO DEADLINE TỰ ĐỘNG</b>\n"
+    
+    header += f"📅 <i>Cập nhật lúc: {now_str}</i>\n"
+    header += f"✍️ Bạn có <b>{len(events)}</b> sự kiện trong 7 ngày tới.\n"
+    header += "━━━━━━━━━━━━━━━━━━"
+    
+    bot.send_message(chatId, header, parse_mode="HTML")
+
     for e in events:
         due = datetime.fromtimestamp(e['timesort']).strftime('%d/%m %H:%M')
         isDone = str(e['id']) in completedIds
@@ -112,6 +130,7 @@ def scanAllDeadlines(bot, chatId, isManual=False):
         markup.add(types.InlineKeyboardButton(btnText, callback_data=callbackData))
         
         bot.send_message(chatId, text, parse_mode="HTML", reply_markup=markup, disable_web_page_preview=True)
+        time.sleep(0.3)
     return True
 
 def getEventIcon(eventType):

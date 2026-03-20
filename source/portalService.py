@@ -43,8 +43,8 @@ def formatCalendarMessage(chatId, dateStr, isAuto=False):
     u = db.getUserCredentials(chatId)
     if not u: return "Bạn chưa đăng ký tài khoản!"
     
-    rawUser = utils.decryptData(u[0])
-    rawPass = utils.decryptData(u[1])
+    rawUser = utils.decryptData(u[1])
+    rawPass = utils.decryptData(u[2])
 
     classes = getClassesByDate(rawUser, rawPass, dateStr)
     if classes:
