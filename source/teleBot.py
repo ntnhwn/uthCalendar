@@ -9,6 +9,7 @@ import courseService
 from datetime import datetime, timedelta
 import database as db
 import cronService
+import task
 
 adminId = utils.os.getenv("ADMIN_ID")
 
@@ -106,8 +107,8 @@ def registerHandlers(bot):
     # --- CHỨC NĂNG PORTAL ---
     @bot.message_handler(func=lambda m: m.text == "📅 Lịch hôm nay")
     def handleToday(message):
-        today = datetime.now().strftime("%Y-%m-%d")
-        bot.send_message(message.chat.id, portalService.formatCalendarMessage(message.chat.id, today), parse_mode="HTML", disable_web_page_preview=True)
+        bot.send_message(message.chat.id, "⏳ Đang điều phối Worker để quét lịch cho bạn...")
+        task.instantTask.apply_async(args=[message.chat.id, 'todayPortal'], queue='high_priority')
 
     @bot.message_handler(func=lambda m: m.text == "⏭️ Lịch ngày mai")
     def handleTomorrow(message):
@@ -127,8 +128,8 @@ def registerHandlers(bot):
     # --- CHỨC NĂNG COURSE ---
     @bot.message_handler(func=lambda m: m.text == "📑 Quét deadline")
     def handleDeadlineScan(message):
-        bot.send_message(message.chat.id, "🔍 Đang kết nối với hệ thống Courses để kiểm tra bài tập giúp bạn...")
-        courseService.scanAllDeadlines(bot, message.chat.id, isManual=True)
+        bot.send_message(message.chat.id, "🔍 Đang điều phối Worker kiểm tra Deadline giúp bạn...")
+        task.instantTask.apply_async(args=[message.chat.id, 'manualDeadline'], queue='high_priority')
 
     @bot.message_handler(func=lambda m: m.text == "📢 Bật tắt thông báo hằng tuần")
     def handleToggleCourse(message):
@@ -145,13 +146,14 @@ def registerHandlers(bot):
 
     @bot.message_handler(func=lambda m: m.text == "📩 Góp ý/Báo lỗi")
     def handleFeedbackRequest(message):
-        msg = bot.send_message(message.chat.id, "😊 Bạn có thể nhập nội dung góp ý hoặc báo lỗi tại đây, mình sẽ gửi đến Admin giúp bạn:")
+        msg = bot.send_message(message.chat.id, "😊 Bạn có thể nhập nội dung góp ý tại đây (Bạn có 60 giây để nhập):")
+        utils.startStepTimeout(bot, message.chat.id)
         bot.register_next_step_handler(msg, processFeedback, bot)
 
     @bot.message_handler(func=lambda m: m.text == "🛠️ Kiểm tra hệ thống")
     def handleStatus(message):
-        msgWait = bot.send_message(message.chat.id, "⏳ Bạn đợi mình xíu nhé, mình đang kiểm tra kết nối...")
-        teleFunc.getSystemStatus(bot, message.chat.id, msgWait.message_id)
+        msgWait = bot.send_message(message.chat.id, "⏳ Đang điều phối Worker kiểm tra kết nối...")
+        task.systemStatusTask.delay(message.chat.id, msgWait.message_id)
 
     @bot.message_handler(func=lambda m: m.text == "📊 Admin Stats" and str(m.chat.id) == adminId)
     def handleAdminStats(message):
@@ -201,11 +203,8 @@ def processMssvStep(message, bot):
 
 def processPasswordStep(message, bot, mssv):
     pwd = message.text
-    bot.send_message(message.chat.id, "⏳ Đang xác thực thông tin, bạn đợi mình một lát nhé...")
-    success, resultMsg = portalService.verifyAndSaveUser(message.chat.id, mssv, pwd)
-    if success:
-        resultMsg += "\n\n✅ Tuyệt vời! Bạn đã đăng ký thành công. Bây giờ bạn có thể xem lịch và deadline rồi đó."
-    bot.send_message(message.chat.id, resultMsg, parse_mode="HTML", reply_markup=mainMenu(message.chat.id))
+    bot.send_message(message.chat.id, "⏳ Thông tin đã được gửi cho Worker xác thực...")
+    task.registrationTask.delay(message.chat.id, mssv, pwd)
 
 def processCustomDate(message, bot):
     try:
@@ -216,6 +215,7 @@ def processCustomDate(message, bot):
         bot.send_message(message.chat.id, "❌ Định dạng ngày chưa đúng (Bạn hãy nhập YYYY-MM-DD, ví dụ: 2026-03-20).")
 
 def processFeedback(message, bot):
+    utils.cancelStepTimeout()
     teleFunc.handleSendFeedback(bot, message, adminId)
 
 def handleMarkDone(bot, call):

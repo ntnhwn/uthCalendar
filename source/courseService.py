@@ -4,6 +4,30 @@ from datetime import datetime
 import database as db
 import utils
 import re
+import redisManager
+
+def rebuildSession(cookieDict):
+    session = requests.Session()
+    cookieJar = requests.utils.cookiejar_from_dict(cookieDict)
+    session.cookies.update(cookieJar)
+    return session
+
+def getValidCourseSession(chatId, rawUser, rawPass):
+    cached = redisManager.getSession(chatId, 'course')
+    if cached:
+        session = rebuildSession(cached['cookies'])
+        return session, cached['sesskey']
+
+    session, sesskey = fetchMoodleSession(rawUser, rawPass) 
+    
+    if session and sesskey:
+        data = {
+            "sesskey": sesskey,
+            "cookies": requests.utils.dict_from_cookiejar(session.cookies)
+        }
+        redisManager.saveSession(chatId, 'course', data)
+        
+    return session, sesskey
 
 def fetchMoodleSession(username, password):
     session = requests.Session()

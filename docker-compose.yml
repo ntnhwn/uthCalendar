@@ -1,32 +1,64 @@
-version: '3.8'
-
 services:
-  db:
+  uth_db:
     image: postgres:15-alpine
     container_name: uth_bot_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: <admin>
-      POSTGRES_PASSWORD: <your_strong_password>
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
       POSTGRES_DB: uth_bot
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  bot:
+  uth_redis:
+    image: redis:7-alpine
+    container_name: uth_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  uth_bot:
     build: .
     container_name: uth_tele_bot
     restart: unless-stopped
     depends_on:
-      - db
+      - uth_db
+      - uth_redis
     environment:
       - TZ=Asia/Ho_Chi_Minh
-      - TELE_TOKEN= <teleToken>
-      - ADMIN_ID= <adminChatID>
-      - DB_HOST=db
-      - DB_NAME=uth_bot
-      - DB_USER= <admin>
-      - DB_PASS= <your_strong_password>
-      - ENCRYPTION_KEY= <your_KEY>
+      - DB_HOST=uth_db  # Sửa từ db thành uth_db để khớp với tên service
+    env_file:
+      - .env
+
+  worker_vip:
+    build: .
+    hostname: VIP_Worker
+    # Dùng python -m celery để tránh lỗi "not found"
+    command: python -m celery -A task worker -Q high_priority --concurrency=1 --loglevel=info
+    deploy:
+      replicas: 2
+    depends_on:
+      - uth_redis
+    env_file: .env
+
+  worker_low:
+    build: .
+    hostname: Low_Worker
+    command: python -m celery -A task worker -Q high_priority,low_priority --concurrency=1 --loglevel=info
+    deploy:
+      replicas: 3
+    depends_on:
+      - uth_redis
+    env_file: .env
+
+  celery_beat:
+    build: .
+    container_name: uth_celery
+    command: python -m celery -A task beat --loglevel=info
+    depends_on:
+      - uth_redis
+    env_file: .env
 
 volumes:
   postgres_data:
+  redis_data:

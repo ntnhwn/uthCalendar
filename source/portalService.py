@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 import database as db
 import utils
+import redisManager
 
 def verifyUthCredentials(user, password):
     try:
@@ -14,10 +15,9 @@ def verifyUthCredentials(user, password):
         return False, data.get("message", "Sai tài khoản hoặc mật khẩu")
     except: return False, "Lỗi kết nối server trường"
 
-def getClassesByDate(user, password, targetDate):
+def getClassesByDate(chatId, user, password, targetDate):
     try:
-        r = requests.post("https://portal.ut.edu.vn/api/v1/user/login", json={"username": user, "password": password}, timeout=20)
-        tk = r.json().get("token")
+        tk = getValidPortalToken(chatId, user, password)
         if not tk: return None
         thu = datetime.strptime(targetDate, "%Y-%m-%d").weekday() + 2 
         res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={targetDate}", headers={"authorization": f"Bearer {tk}"}, timeout=20)
@@ -39,6 +39,20 @@ def verifyAndSaveUser(chatId, mssv, password):
     utils.log("ERROR", f"User {chatId} đăng ký thất bại: {reason}")
     return False, f"❌ Thất bại: {reason}"
 
+def getValidPortalToken(chatId, rawUser, rawPass):
+    cachedToken = redisManager.getSession(chatId, 'portal')
+    if cachedToken: return cachedToken
+
+    try:
+        r = requests.post("https://portal.ut.edu.vn/api/v1/user/login", 
+                        json={"username": rawUser, "password": rawPass}, timeout=15)
+        token = r.json().get("token")
+        if token:
+            redisManager.saveSession(chatId, 'portal', token, expire=7200)
+            return token
+    except: pass
+    return None
+
 def formatCalendarMessage(chatId, dateStr, isAuto=False):
     u = db.getUserCredentials(chatId)
     if not u: return "Bạn chưa đăng ký tài khoản!"
@@ -46,7 +60,7 @@ def formatCalendarMessage(chatId, dateStr, isAuto=False):
     rawUser = utils.decryptData(u[1])
     rawPass = utils.decryptData(u[2])
 
-    classes = getClassesByDate(rawUser, rawPass, dateStr)
+    classes = getClassesByDate(chatId, rawUser, rawPass, dateStr)
     if classes:
         header = f"🔔 <b>NHẮC LỊCH TỰ ĐỘNG ({dateStr})</b>\n" if isAuto else f"📅 <b>LỊCH HỌC {dateStr}</b>\n"
         msg = header + "━━━━━━━━━━━━━━━━━━\n"

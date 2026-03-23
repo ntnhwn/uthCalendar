@@ -59,7 +59,7 @@ def broadcastToAllUsers(bot, content):
 def handleToggleNotify(chatId):
     u = db.getUserCredentials(chatId)
     if not u: return None, "❌ Bạn chưa đăng ký tài khoản."
-    newStatus = not u[4]
+    newStatus = not u[3]
     portalService.updateNotifyStatus(chatId, newStatus)
     return newStatus, f"✅ Đã <b>{'BẬT' if newStatus else 'TẮT'}</b> nhắc lịch tự động!"
 
