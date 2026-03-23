@@ -99,3 +99,29 @@ def getDeadlineStatus(chatId):
         res = cur.fetchone(); cur.close(); conn.close()
         return res[0] if res else True
     except: return True
+
+def getUsersForPortalNotify():
+    try:
+        conn = getDbConn()
+        cur = conn.cursor()
+        cur.execute("SELECT chat_id FROM users WHERE notify_enabled = TRUE")
+        res = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return res
+    except Exception as e:
+        log("ERROR", f"Lỗi lấy list Portal Notify: {e}")
+        return []
+
+def getUsersForDeadlineNotify():
+    try:
+        conn = getDbConn()
+        cur = conn.cursor()
+        cur.execute("SELECT chat_id FROM users WHERE notify_deadline = TRUE")
+        res = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return res
+    except Exception as e:
+        log("ERROR", f"Lỗi lấy list Deadline Notify: {e}")
+        return []
