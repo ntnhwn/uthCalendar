@@ -21,8 +21,12 @@ def saveSession(chatId, serviceType, data, expire=7200):
 def getSession(chatId, serviceType):
     key = f"auth:{serviceType}:{chatId}"
     data = redisClient.get(key)
-    return json.loads(data) if data else None
+    if data:
+        log("REDIS", f"Đã đẩy cache cho {chatId} - {serviceType}")
+        return json.loads(data)
+    return None
 
 def deleteSession(chatId, serviceType):
     key = f"auth:{serviceType}:{chatId}"
     redisClient.delete(key)
+    log("REDIS", f"Đã xoá cache cho {chatId} - {serviceType}")
