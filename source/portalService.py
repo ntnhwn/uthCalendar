@@ -19,10 +19,32 @@ def getClassesByDate(chatId, user, password, targetDate):
     try:
         tk = getValidPortalToken(chatId, user, password)
         if not tk: return None
-        thu = datetime.strptime(targetDate, "%Y-%m-%d").weekday() + 2 
-        res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={targetDate}", headers={"authorization": f"Bearer {tk}"}, timeout=20)
-        return [c for c in res.json().get("body", []) if c.get("thu") == thu]
-    except: return None
+        
+        # 1. Bẫy format ngày: Chuyển YYYY-MM-DD sang DD/MM/YYYY để khớp ngayBatDauHoc
+        searchDate = datetime.strptime(targetDate, "%Y-%m-%d").strftime("%d/%m/%Y")
+        
+        # 2. Bẫy Headers: Portal giờ check Referer cực gắt, thiếu là nó trả body rỗng
+        headers = {
+            "authorization": f"Bearer {tk}",
+            "Referer": "https://portal.ut.edu.vn/calendar",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+            "accept": "application/json, text/plain, */*"
+        }
+        
+        res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={targetDate}", headers=headers, timeout=20)
+        
+        if res.status_code != 200:
+            return None
+            
+        body = res.json().get("body", [])
+        
+        # 3. Logic lọc mới: Đừng tin thằng 'thu', hãy tin thằng 'ngayBatDauHoc'
+        # Vì Portal giờ trả ngayBatDauHoc khớp với ngày thực tế của buổi học đó luôn
+        return [c for c in body if c.get("ngayBatDauHoc") == searchDate]
+        
+    except Exception as e:
+        print(f"Lỗi quét lịch: {e}")
+        return None
 
 def verifyAndSaveUser(chatId, mssv, password):
     isValid, reason = verifyUthCredentials(mssv, password)
