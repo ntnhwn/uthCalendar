@@ -36,9 +36,9 @@ def portalSubMenu():
     return markup
 
 def courseSubMenu():
-    markup = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     markup.add("📢 Bật tắt thông báo hằng tuần")
-    markup.add("📑 Quét deadline")
+    markup.add("📑 Quét deadline", "🔍 Quét tùy chỉnh")
     markup.add("🏠 Quay lại menu chính")
     return markup
 
@@ -134,6 +134,11 @@ def registerHandlers(bot):
         bot.send_message(message.chat.id, "🔍 Đang điều phối Worker kiểm tra Deadline giúp bạn...")
         task.deadlineTask.delay(message.chat.id)
 
+    @bot.message_handler(func=lambda message: message.text == "🔍 Quét tùy chỉnh")
+    def handleCustomScan(message):
+        msg = bot.send_message(message.chat.id, "📅 Nhập ngày bắt đầu quét (Định dạng: DD/MM/YYYY\nVD: 01/04/2026):")
+        bot.register_next_step_handler(msg, processDateStep, bot)
+
     @bot.message_handler(func=lambda m: m.text == "📢 Bật tắt thông báo hằng tuần")
     def handleToggleCourse(message):
         chatId = message.chat.id
@@ -210,15 +215,49 @@ def processPasswordStep(message, bot, mssv):
     task.registrationTask.delay(message.chat.id, mssv, pwd)
 
 def processCustomDate(message, bot):
-    utils.cancelStepTimeout(message.chat.id) 
+    utils.cancelStepTimeout(message.chat.id)
     
     try:
         dateStr = message.text
-        datetime.strptime(dateStr, "%Y-%m-%d")
-        bot.send_message(message.chat.id, f"⏳ Đang điều phối Worker để quét lịch ngày {dateStr} cho bạn...")
+        datetime.strptime(dateStr, "%d/%m/%Y")
+        
+        bot.send_message(
+            message.chat.id, 
+            f"⏳ Đang điều phối Worker để quét lịch ngày {dateStr} cho bạn..."
+        )
         task.portalTask.delay(message.chat.id, dateStr)
+        
+    except ValueError:
+        bot.send_message(
+            message.chat.id, 
+            "❌ Định dạng ngày chưa đúng!\n"
+            "Hãy nhập theo kiểu: <b>DD/MM/YYYY</b> (ví dụ: 20/03/2026)."
+            , parse_mode="HTML"
+        )
     except Exception as e:
-        bot.send_message(message.chat.id, "❌ Định dạng ngày chưa đúng (Bạn hãy nhập YYYY-MM-DD, ví dụ: 2026-03-20).")
+        utils.log("ERROR", f"Lỗi processCustomDate: {e}")
+
+def processDateStep(message, bot):
+    try:
+        startDateStr = message.text
+        datetime.strptime(startDateStr, "%d/%m/%Y")
+        
+        msg = bot.send_message(message.chat.id, "⏳ Bạn muốn quét trong bao nhiêu ngày tới? (VD: 14):")
+        bot.register_next_step_handler(msg, processDaysStep, startDateStr, bot)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Sai định dạng ngày rồi bạn ơi! Bấm lại nút để làm lại nhé.")
+
+def processDaysStep(message, startDateStr, bot):
+    try:
+        numDays = int(message.text)
+        if numDays <= 0:
+            raise ValueError("Số ngày phải lớn hơn 0")
+
+        bot.send_message(message.chat.id, f"🚀 Đang gửi yêu cầu quét từ {startDateStr} trong {numDays} ngày...")
+        
+        task.customDeadlineTask.delay(message.chat.id, startDateStr, numDays)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Số ngày phải là số nguyên dương!")
 
 def processFeedback(message, bot):
     utils.cancelStepTimeout()

@@ -2,7 +2,7 @@
 # tasks.py
 
 import os
-import time
+from datetime import datetime
 from celeryApp import app
 from telebot import TeleBot
 import courseService
@@ -61,6 +61,12 @@ def systemStatusTask(self, chatId, msgWaitId):
 def feedbackTask(self, chatId, text, adminId):
     import teleFunc
     teleFunc.handleSendFeedback(bot, text, chatId, adminId)
+
+@app.task(bind=True, name='tasks.customDeadlineTask', queue='high_priority')
+def customDeadlineTask(self, chatId, startDateStr, numDays):
+    sendWorkerCheckIn(self, chatId)
+    startDate = datetime.strptime(startDateStr, "%d/%m/%Y")
+    courseService.scanAllDeadlines(bot, chatId, isManual=True, startDate=startDate, numDays=numDays)
 
 
 # ==========================================

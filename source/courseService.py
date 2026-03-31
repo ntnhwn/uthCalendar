@@ -75,8 +75,10 @@ def prepareMonthlyPayload(startDate, numDays):
         })
     return payload, now_ts, end_ts
 
-def getDeadlineMessages(chatId, session, sesskey, numDays=7):
-    startDate = datetime.now()
+def getDeadlineMessages(chatId, session, sesskey, startDate=None, numDays=7):
+    if startDate is None:
+        startDate = datetime.now()
+        
     payload, startTs, endTs = prepareMonthlyPayload(startDate, numDays)
     url = f"https://courses.ut.edu.vn/lib/ajax/service.php?sesskey={sesskey}"
     
@@ -129,7 +131,7 @@ def getDeadlineMessages(chatId, session, sesskey, numDays=7):
         utils.log("ERROR", f"Lỗi lấy message deadline: {e}")
         return []
 
-def scanAllDeadlines(bot, chatId, isManual=False):
+def scanAllDeadlines(bot, chatId, isManual=False, startDate=None, numDays=7):
     u = db.getUserCredentials(chatId)
     if not u: return False
 
@@ -142,7 +144,7 @@ def scanAllDeadlines(bot, chatId, isManual=False):
         if isManual: bot.send_message(chatId, "❌ Không thể kết nối hệ thống Courses.")
         return False
 
-    messages = getDeadlineMessages(chatId, session, sesskey, numDays=7)
+    messages = getDeadlineMessages(chatId, session, sesskey, startDate=startDate, numDays=numDays)
 
     if messages is None:
         utils.log("INFO", f"Đang làm mới sesskey cho {chatId}")
@@ -158,14 +160,14 @@ def scanAllDeadlines(bot, chatId, isManual=False):
         return True
 
     # Gửi tin nhắn Header trước khi liệt kê
-    now_str = datetime.now().strftime('%H:%M - %d/%m/%Y')
+    now_str = startDate.strftime('%d/%m/%Y') if startDate else datetime.now().strftime('%d/%m/%Y')
     if isManual:
         header = f"🔍 <b>DANH SÁCH DEADLINE MỚI NHẤT</b>\n"
     else:
         header = f"🚀 <b>THÔNG BÁO DEADLINE TỰ ĐỘNG</b>\n"
     
     header += f"📅 <i>Cập nhật lúc: {now_str}</i>\n"
-    header += f"✍️ Bạn có <b>{len(messages)}</b> sự kiện trong 7 ngày tới.\n"
+    header += f"✍️ Bạn có <b>{len(messages)}</b> sự kiện trong {numDays} ngày tới.\n"
     header += "━━━━━━━━━━━━━━━━━━"
     
     bot.send_message(chatId, header, parse_mode="HTML")
