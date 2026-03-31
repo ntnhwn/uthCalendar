@@ -20,10 +20,10 @@ def getClassesByDate(chatId, user, password, targetDate):
         tk = getValidPortalToken(chatId, user, password)
         if not tk: return None
         
-        # 1. Bẫy format ngày: Chuyển YYYY-MM-DD sang DD/MM/YYYY để khớp ngayBatDauHoc
-        searchDate = datetime.strptime(targetDate, "%Y-%m-%d").strftime("%d/%m/%Y")
+        dateObj = datetime.strptime(targetDate, "%d/%m/%Y")
+        isoDate = dateObj.strftime("%Y-%m-%d")
+        searchDate = targetDate
         
-        # 2. Bẫy Headers: Portal giờ check Referer cực gắt, thiếu là nó trả body rỗng
         headers = {
             "authorization": f"Bearer {tk}",
             "Referer": "https://portal.ut.edu.vn/calendar",
@@ -31,21 +31,17 @@ def getClassesByDate(chatId, user, password, targetDate):
             "accept": "application/json, text/plain, */*"
         }
         
-        res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={targetDate}", headers=headers, timeout=20)
+        res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={isoDate}", headers=headers, timeout=20)
         
         if res.status_code == 401:
             utils.log("WARN", f"Token của {chatId} bị Invalid. Đang login lại")
             tk = redisManager.loginAndSaveToken(chatId, user, password) 
-            
             if not tk: return None
-        
-        headers["authorization"] = f"Bearer {tk}"
-        res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={targetDate}", headers=headers)
+            headers["authorization"] = f"Bearer {tk}"
+            res = requests.get(f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={isoDate}", headers=headers)
             
         body = res.json().get("body", [])
         
-        # 3. Logic lọc mới: Đừng tin thằng 'thu', hãy tin thằng 'ngayBatDauHoc'
-        # Vì Portal giờ trả ngayBatDauHoc khớp với ngày thực tế của buổi học đó luôn
         if res.status_code == 200:
             return [c for c in body if c.get("ngayBatDauHoc") == searchDate]
         

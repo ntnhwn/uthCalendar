@@ -12,7 +12,7 @@ load_dotenv()
 encryptionKey = os.getenv("ENCRYPTION_KEY")
 cipherSuite = Fernet(encryptionKey.encode()) if encryptionKey else None
 
-def getNow(): return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def getNow(): return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 def log(level, message): print(f"[{getNow()}] [{level}] {message}", flush=True)
 
 def encryptData(data):
@@ -23,7 +23,6 @@ def decryptData(encryptedData):
     if not encryptedData: return None
     return cipherSuite.decrypt(encryptedData.encode()).decode()
 
-# step timeout
 userTimers = {}
 
 def startStepTimeout(bot, chatId, seconds=60):

@@ -106,9 +106,8 @@ def getDeadlineMessages(chatId, session, sesskey, startDate=None, numDays=7):
         
         msgList = []
         for e in all_events:
-            # FIX GIỜ: Cộng 7 tiếng (GMT+7) và trừ 30 phút (nhắc sớm) = + 6.5 hours
             due_dt = datetime.fromtimestamp(e['timesort']) + timedelta(hours=7, minutes=-30)
-            due = due_dt.strftime('%d/%m %H:%M')
+            due = due_dt.strftime('%d/%m/%Y %H:%M')
             isDone = str(e['id']) in completedIds
             status = "✅ Đã xong" if isDone else "❌ Chưa xong"
             
@@ -153,13 +152,13 @@ def scanAllDeadlines(bot, chatId, isManual=False, startDate=None, numDays=7):
         if session and sesskey:
             data = {"sesskey": sesskey, "cookies": requests.utils.dict_from_cookiejar(session.cookies)}
             redisManager.saveSession(chatId, 'course', data)
-            messages = getDeadlineMessages(chatId, session, sesskey, numDays=7)
+            messages = getDeadlineMessages(chatId, session, sesskey, startDate=startDate, numDays=numDays)
+            
     if not messages:
         if isManual:
-            bot.send_message(chatId, "🎉 <b>Tuyệt vời!</b>\nBạn không có deadline nào trong 7 ngày tới. Nghỉ ngơi thôi!", parse_mode="HTML")
+            bot.send_message(chatId, "🎉 <b>Tuyệt vời!</b>\nBạn không có deadline nào trong khoảng thời gian này. Nghỉ ngơi thôi!", parse_mode="HTML")
         return True
 
-    # Gửi tin nhắn Header trước khi liệt kê
     now_str = startDate.strftime('%d/%m/%Y') if startDate else datetime.now().strftime('%d/%m/%Y')
     if isManual:
         header = f"🔍 <b>DANH SÁCH DEADLINE MỚI NHẤT</b>\n"

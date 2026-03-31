@@ -13,10 +13,6 @@ import task
 
 adminId = utils.os.getenv("ADMIN_ID")
 
-# ==========================================
-# 1. CẤU HÌNH HỆ THỐNG MENU (KEYBOARDS)
-# ==========================================
-
 def mainMenu(chatId):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     markup.add("🏛️ Portal Menu", "📚 Course Menu") 
@@ -51,10 +47,6 @@ def adminSubMenu():
     )
     return markup
 
-# ==========================================
-# 2. ĐĂNG KÝ CÁC HANDLER
-# ==========================================
-
 def setBotCommands(bot):
     try:
         commands = [
@@ -68,7 +60,6 @@ def setBotCommands(bot):
 
 def registerHandlers(bot):
     
-    # --- LỆNH COMMAND (/) ---
     @bot.message_handler(commands=['start', 'help'])
     def welcome(message):
         welcomeText = (
@@ -91,7 +82,6 @@ def registerHandlers(bot):
         total = teleFunc.broadcastToAllUsers(bot, rawInput[1])
         bot.send_message(message.chat.id, f"✅ Đã gửi thông báo thành công cho {total} người dùng.")
 
-    # --- ĐIỀU HƯỚNG MENU (FOLDERS) ---
     @bot.message_handler(func=lambda m: m.text == "🏛️ Portal Menu")
     def openPortal(message):
         bot.send_message(message.chat.id, "🏛️ <b>HỆ THỐNG PORTAL</b>", parse_mode="HTML", reply_markup=portalSubMenu())
@@ -104,22 +94,21 @@ def registerHandlers(bot):
     def backToMain(message):
         bot.send_message(message.chat.id, "🏠 Đã quay lại Menu chính.", reply_markup=mainMenu(message.chat.id))
 
-    # --- CHỨC NĂNG PORTAL ---
     @bot.message_handler(func=lambda m: m.text == "📅 Lịch hôm nay")
     def handleToday(message):
         bot.send_message(message.chat.id, "⏳ Đang điều phối Worker để quét lịch cho bạn...")
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now().strftime("%d/%m/%Y")
         task.portalTask.delay(message.chat.id, today)
 
     @bot.message_handler(func=lambda m: m.text == "⏭️ Lịch ngày mai")
     def handleTomorrow(message):
         bot.send_message(message.chat.id, "⏳ Đang điều phối Worker để quét lịch ngày mai cho bạn...")
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d/%m/%Y")
         task.portalTask.delay(message.chat.id, tomorrow)
 
     @bot.message_handler(func=lambda m: m.text == "📆 Lịch ngày tùy chọn")
     def handleCustomDateRequest(message):
-        msg = bot.send_message(message.chat.id, "📅 Bạn vui lòng nhập ngày muốn xem (Định dạng: <code>YYYY-MM-DD</code>):", parse_mode="HTML")
+        msg = bot.send_message(message.chat.id, "📅 Bạn vui lòng nhập ngày muốn xem (Định dạng: <code>DD/MM/YYYY</code>):", parse_mode="HTML")
         utils.startStepTimeout(bot, message.chat.id) 
         bot.register_next_step_handler(msg, processCustomDate, bot)
 
@@ -128,7 +117,6 @@ def registerHandlers(bot):
         _, resMsg = teleFunc.handleToggleNotify(message.chat.id)
         bot.send_message(message.chat.id, resMsg, parse_mode="HTML")
 
-    # --- CHỨC NĂNG COURSE ---
     @bot.message_handler(func=lambda m: m.text == "📑 Quét deadline")
     def handleDeadlineScan(message):
         bot.send_message(message.chat.id, "🔍 Đang điều phối Worker kiểm tra Deadline giúp bạn...")
@@ -145,7 +133,6 @@ def registerHandlers(bot):
         _, resMsg = teleFunc.handleToggleDeadlineNotify(chatId)
         bot.send_message(chatId, resMsg, parse_mode="HTML")
 
-    # --- CÁC CHỨC NĂNG CHUNG ---
     @bot.message_handler(commands=['login'])
     @bot.message_handler(func=lambda m: m.text == "🔑 Đăng ký")
     def handleRegister(message):
@@ -167,7 +154,6 @@ def registerHandlers(bot):
     def handleAdminStats(message):
         bot.send_message(message.chat.id, teleFunc.getAdminStats(adminId), parse_mode="HTML")
 
-    # --- CALLBACK NÚT BẤM (DEADLINE) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith('done_'))
     def onMarkDone(call):
         handleMarkDone(bot, call)
@@ -177,13 +163,13 @@ def registerHandlers(bot):
         handleMarkUndone(bot, call)
 
     @bot.message_handler(func=lambda m: m.text == "⚙️ Admin Panel")
-    def handle_admin_panel(message):
+    def handleAdminPanel(message):
         if str(message.chat.id) == str(adminId):
             bot.send_message(message.chat.id, "🛠 **ADMIN CONTROL PANEL**\nMày muốn test lập lịch nào?", 
                             reply_markup=adminSubMenu(), parse_mode="Markdown")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith('test_cron_'))
-    def handle_test_cron(call):
+    def handleTestCron(call):
         import threading
         if call.data == "test_cron_portal":
             bot.answer_callback_query(call.id, "🚀 Đang chạy quét lịch...")
@@ -192,14 +178,9 @@ def registerHandlers(bot):
             bot.answer_callback_query(call.id, "🚀 Đang chạy quét deadline...")
             threading.Thread(target=cronService.autoScanAllUsers, args=(bot,)).start()
 
-    # --- NHẮC LỆNH SAI ---
     @bot.message_handler(func=lambda m: True)
     def handleUnknown(message):
         bot.reply_to(message, "⚠️ Lệnh này mình chưa hiểu, bạn vui lòng sử dụng các nút ở menu nhé!", reply_markup=mainMenu(message.chat.id))
-
-# ==========================================
-# 3. LOGIC XỬ LÝ NỘI BỘ
-# ==========================================
 
 def processMssvStep(message, bot):
     mssv = message.text
@@ -216,24 +197,13 @@ def processPasswordStep(message, bot, mssv):
 
 def processCustomDate(message, bot):
     utils.cancelStepTimeout(message.chat.id)
-    
     try:
         dateStr = message.text
         datetime.strptime(dateStr, "%d/%m/%Y")
-        
-        bot.send_message(
-            message.chat.id, 
-            f"⏳ Đang điều phối Worker để quét lịch ngày {dateStr} cho bạn..."
-        )
+        bot.send_message(message.chat.id, f"⏳ Đang điều phối Worker để quét lịch ngày {dateStr} cho bạn...")
         task.portalTask.delay(message.chat.id, dateStr)
-        
     except ValueError:
-        bot.send_message(
-            message.chat.id, 
-            "❌ Định dạng ngày chưa đúng!\n"
-            "Hãy nhập theo kiểu: <b>DD/MM/YYYY</b> (ví dụ: 20/03/2026)."
-            , parse_mode="HTML"
-        )
+        bot.send_message(message.chat.id, "❌ Định dạng ngày chưa đúng!\nHãy nhập theo kiểu: <b>DD/MM/YYYY</b> (ví dụ: 20/03/2026).", parse_mode="HTML")
     except Exception as e:
         utils.log("ERROR", f"Lỗi processCustomDate: {e}")
 
@@ -241,7 +211,6 @@ def processDateStep(message, bot):
     try:
         startDateStr = message.text
         datetime.strptime(startDateStr, "%d/%m/%Y")
-        
         msg = bot.send_message(message.chat.id, "⏳ Bạn muốn quét trong bao nhiêu ngày tới? (VD: 14):")
         bot.register_next_step_handler(msg, processDaysStep, startDateStr, bot)
     except ValueError:
@@ -252,22 +221,20 @@ def processDaysStep(message, startDateStr, bot):
         numDays = int(message.text)
         if numDays <= 0:
             raise ValueError("Số ngày phải lớn hơn 0")
-
         bot.send_message(message.chat.id, f"🚀 Đang gửi yêu cầu quét từ {startDateStr} trong {numDays} ngày...")
-        
         task.customDeadlineTask.delay(message.chat.id, startDateStr, numDays)
     except ValueError:
         bot.send_message(message.chat.id, "❌ Số ngày phải là số nguyên dương!")
 
 def processFeedback(message, bot):
-    utils.cancelStepTimeout()
+    utils.cancelStepTimeout(message.chat.id)
     teleFunc.handleSendFeedback(bot, message, adminId)
 
 def handleMarkDone(bot, call):
     chatId = call.message.chat.id
     taskId = call.data.split('_')[1]
     if db.markTaskCompleted(chatId, taskId):
-        new_text = call.message.text.replace("❌ Chưa hoàn thành", "✅ Đã hoàn thành")
+        new_text = call.message.text.replace("❌ Chưa xong", "✅ Đã xong")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("❌ Đánh dấu chưa xong", callback_data=f"undone_{taskId}"))
         try:
@@ -279,7 +246,7 @@ def handleMarkUndone(bot, call):
     chatId = call.message.chat.id
     taskId = call.data.split('_')[1]
     if db.unmarkTaskCompleted(chatId, taskId):
-        new_text = call.message.text.replace("✅ Đã hoàn thành", "❌ Chưa hoàn thành")
+        new_text = call.message.text.replace("✅ Đã xong", "❌ Chưa xong")
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("✅ Đánh dấu hoàn thành", callback_data=f"done_{taskId}"))
         try:

@@ -15,7 +15,7 @@ def autoCheckAndNotify(bot):
             log("CRON", "Không có user nào cần quét Portal")
             return
 
-        today = time.strftime("%Y-%m-%d")
+        today = time.strftime("%d/%m/%Y")
         for chat_id in users:
             try:
                 task.periodicPortalTask.delay(chat_id, today)
