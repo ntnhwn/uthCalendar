@@ -1,14 +1,37 @@
 services:
   uth_db:
     image: postgres:15-alpine
-    container_name: uth_bot_db
+    container_name: uth_calendar_db
     restart: unless-stopped
+    networks:
+      - uth-network
+    ports:
+      - "5432:5432" # optional
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: uth_bot
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - uth_db_data:/var/lib/postgresql/data
+
+  uth_bot:
+    image: vanphat111/uth-calendar:latest
+    container_name: uth_calendar_bot
+    restart: unless-stopped
+    depends_on:
+      - uth_db
+    networks:
+      - uth-network
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Ho_Chi_Minh
+      - TELE_TOKEN=${TELE_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
   uth_redis:
     image: redis:7-alpine
@@ -16,49 +39,85 @@ services:
     restart: always
     volumes:
       - redis_data:/data
+    networks:
+      - uth-network
+    ports:
+      - "6379:6379" # optional
 
-  uth_bot:
-    build: .
-    container_name: uth_tele_bot
-    restart: unless-stopped
-    depends_on:
-      - uth_db
-      - uth_redis
+  flower:
+    image: mher/flower:latest
+    container_name: uth_flower
     environment:
-      - TZ=Asia/Ho_Chi_Minh
-      - DB_HOST=uth_db  # Sửa từ db thành uth_db để khớp với tên service
-    env_file:
-      - .env
+      - CELERY_BROKER_URL=redis://uth_redis:6379/0
+    ports:
+      - 5555:5555 # optional
+    depends_on:
+      - uth_redis
+    networks:
+      - uth-network
+      - nginx-proxy # optional
 
   worker_vip:
-    build: .
+    image: vanphat111/uth-calendar:latest
     hostname: VIP_Worker
-    # Dùng python -m celery để tránh lỗi "not found"
     command: python -m celery -A task worker -Q high_priority --concurrency=1 --loglevel=info
     deploy:
       replicas: 2
+    networks:
+      - uth-network
     depends_on:
       - uth_redis
-    env_file: .env
+      - uth_db
+    environment:
+      - TELE_TOKEN=${TELE_TOKEN}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
   worker_low:
-    build: .
+    image: vanphat111/uth-calendar:latest
     hostname: Low_Worker
     command: python -m celery -A task worker -Q high_priority,low_priority --concurrency=1 --loglevel=info
     deploy:
       replicas: 3
+    networks:
+      - uth-network
     depends_on:
       - uth_redis
-    env_file: .env
+      - uth_db
+    environment:
+      - TELE_TOKEN=${TELE_TOKEN}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
   celery_beat:
-    build: .
-    container_name: uth_celery
+    image: vanphat111/uth-calendar:latest
+    container_name: uth_celery_beat
     command: python -m celery -A task beat --loglevel=info
+    networks:
+      - uth-network
     depends_on:
       - uth_redis
-    env_file: .env
+      - uth_db
+    environment:
+      - TELE_TOKEN=${TELE_TOKEN}
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 volumes:
-  postgres_data:
+  uth_db_data:
   redis_data:
+
+networks:
+  uth-network:
+    driver: bridge
+  nginx-proxy: #optional
+    external: true # optional
