@@ -7,6 +7,8 @@ from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 import threading
 import json
+import string
+import random
 
 load_dotenv()
 
@@ -78,3 +80,7 @@ def getWeatherByHour(campusCode, targetTimeStr, dateStr):
         log("ERROR", f"Lỗi getWeatherByHour: {e}")
     
     return None
+
+def generateFakeCaptcha(length=30):
+    chars = string.ascii_letters + string.digits + "-_"
+    return ''.join(random.choice(chars) for _ in range(length))

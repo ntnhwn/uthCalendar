@@ -9,7 +9,10 @@ import redisManager
 
 def verifyUthCredentials(user, password):
     try:
-        r = requests.post("https://portal.ut.edu.vn/api/v1/user/login", json={"username": user, "password": password}, timeout=15)
+        fakeCaptcha = utils.generateFakeCaptcha()
+        url = f"https://portal.ut.edu.vn/api/v1/user/login?g-recaptcha-response={fakeCaptcha}"
+
+        r = requests.post(url, json={"username": user, "password": password}, timeout=15)
         data = r.json()
         if r.status_code == 200 and data.get("token"): return True, "Thành công"
         return False, data.get("message", "Sai tài khoản hoặc mật khẩu")
@@ -69,8 +72,10 @@ def getValidPortalToken(chatId, rawUser, rawPass):
     if cachedToken: return cachedToken
 
     try:
-        r = requests.post("https://portal.ut.edu.vn/api/v1/user/login", 
-                        json={"username": rawUser, "password": rawPass}, timeout=15)
+        fakeCaptcha = utils.generateFakeCaptcha()
+        url = f"https://portal.ut.edu.vn/api/v1/user/login?g-recaptcha-response={fakeCaptcha}"
+        r = requests.post(url, json={"username": rawUser, "password": rawPass}, timeout=15)
+        
         token = r.json().get("token")
         if token:
             redisManager.saveSession(chatId, 'portal', token, expire=7200)

@@ -5,6 +5,7 @@ import redis
 import json
 import os
 from utils import log
+import utils
 import requests
 
 redisClient = redis.Redis(
@@ -34,8 +35,10 @@ def deleteSession(chatId, serviceType):
 
 def loginAndSaveToken(chatId, user, password):
     try:
+        fakeCaptcha = utils.generateFakeCaptcha()
+        url = f"https://portal.ut.edu.vn/api/v1/user/login?g-recaptcha-response={fakeCaptcha}"
         r = requests.post(
-            "https://portal.ut.edu.vn/api/v1/user/login", 
+            url, 
             json={"username": user, "password": password}, 
             timeout=15
         )

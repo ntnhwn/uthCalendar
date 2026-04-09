@@ -33,8 +33,11 @@ def fetchMoodleSession(username, password):
     session = requests.Session()
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        r_portal = session.post("https://portal.ut.edu.vn/api/v1/user/login", 
-                                json={"username": username, "password": password}, headers=headers, timeout=15)
+        fakeCaptcha = utils.generateFakeCaptcha()
+        url = f"https://portal.ut.edu.vn/api/v1/user/login?g-recaptcha-response={fakeCaptcha}"
+        
+        r_portal = session.post(url, json={"username": username, "password": password}, headers=headers, timeout=15)
+
         jwt = r_portal.json().get("token")
         if not jwt: return None, None
 
