@@ -23,7 +23,7 @@ def verifyUthCredentials(user, password):
 def getClassesByDate(chatId, user, password, targetDate):
     try:
         tk = getValidPortalToken(chatId, user, password)
-        if not tk: return None
+        if not tk: return False, "Không thể lấy Token. Vui lòng kiểm tra lại tài khoản/mật khẩu."
         
         dateObj = datetime.strptime(targetDate, "%d/%m/%Y")
         isoDate = dateObj.strftime("%Y-%m-%d")
@@ -42,7 +42,8 @@ def getClassesByDate(chatId, user, password, targetDate):
         if res.status_code == 401:
             utils.log("WARN", f"Token của {chatId} bị Invalid. Đang login lại")
             tk = redisManager.loginAndSaveToken(chatId, user, password) 
-            if not tk: return None
+            if not tk: return False, "Phiên đăng nhập hết hạn và không thể gia hạn. Hãy đăng ký lại."
+
             headers["authorization"] = f"Bearer {tk}"
             url = f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={isoDate}"
             res = utils.safeRequest("GET", url, headers=headers)
@@ -50,11 +51,15 @@ def getClassesByDate(chatId, user, password, targetDate):
         body = res.json().get("body", [])
         
         if res.status_code == 200:
-            return [c for c in body if c.get("ngayBatDauHoc") == searchDate]
+            data = res.json().get("body", [])
+            classes = [c for c in data if c.get("ngayBatDauHoc") == targetDate]
+            return classes, None
         
+        return False, f"Lỗi không xác định từ server trường (Mã: {res.status_code})"
+    
     except Exception as e:
         print(f"Lỗi quét lịch: {e}")
-        return None
+        return False, f"Lỗi hệ thống không xác định. Vui lòng thử lại sau ít phút."
 
 def verifyAndSaveUser(chatId, mssv, password):
     isValid, reason = verifyUthCredentials(mssv, password)
@@ -96,7 +101,10 @@ def formatCalendarMessage(chatId, dateStr, isAuto=False):
     rawUser = utils.decryptData(u['uth_user'])
     rawPass = utils.decryptData(u['uth_pass'])
 
-    classes = getClassesByDate(chatId, rawUser, rawPass, dateStr)
+    classes, error = getClassesByDate(chatId, rawUser, rawPass, dateStr)
+    if classes is False:
+        return f"❌ {error}"
+    
     if classes:
         header = f"🔔 <b>NHẮC LỊCH TỰ ĐỘNG ({dateStr})</b>\n" if isAuto else f"📅 <b>LỊCH HỌC {dateStr}</b>\n"
         msg = header + "━━━━━━━━━━━━━━━━━━\n"
