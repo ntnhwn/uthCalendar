@@ -10,11 +10,13 @@ import json
 import string
 import random
 from curl_cffi import requests
+import time
 
 load_dotenv()
 
 encryptionKey = os.getenv("ENCRYPTION_KEY")
 cipherSuite = Fernet(encryptionKey.encode()) if encryptionKey else None
+WARP_PROXY = os.getenv("WARP_PROXY_URL", "socks5://uth_warp:1080")
 
 def getNow(): return datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 def log(level, message): print(f"[{getNow()}] [{level}] {message}", flush=True)
@@ -86,19 +88,45 @@ def generateFakeCaptcha(length=30):
     chars = string.ascii_letters + string.digits + "-_"
     return ''.join(random.choice(chars) for _ in range(length))
 
-def safeRequest(method, url, **kwargs):
+def safeRequest(method, url, use_proxy=True, silent=False, retries=3, **kwargs):
+    # CHỖ NÀY: Import bên trong hàm để tránh Circular Import
+    from warpManager import warp_manager 
+    
     headers = kwargs.get("headers", {})
     headers.update({"Connection": "close"})
     kwargs["headers"] = headers
-    
     kwargs.setdefault("impersonate", "chrome110")
-    kwargs.setdefault("timeout", 20)
+    kwargs.setdefault("timeout", 10)
 
-    try:
-        with requests.Session() as s:
-            respone = getattr(s, method.lower())(url, **kwargs)
-            log(method, f"Gửi thành công request: {url}")
-            return respone
-    except Exception as e:
-        log("WARN", f"Request Error: {e}")
-        return None
+    for attempt in range(retries):
+        if use_proxy:
+            kwargs["proxies"] = {
+                "http": WARP_PROXY,
+                "https": WARP_PROXY
+            }
+        else:
+            kwargs.pop("proxies", None)
+
+        try:
+            with requests.Session() as s:
+                response = getattr(s, method.lower())(url, **kwargs)
+                if not silent: 
+                    log(method, f"Thành công: {url}")
+                
+                if response.status_code == 429:
+                    log("WARN", "Dính lỗi 429 (Spam). Đang thực hiện reset WARP...")
+                    warp_manager.restart_warp()
+                    # Nghỉ 5s cho tunnel ổn định rồi thử lại lượt tiếp theo
+                    time.sleep(5)
+                    continue 
+                    
+                return response
+        except Exception as e:
+            if not silent:
+                log("WARN", f"Lần thử {attempt+1} qua WARP thất bại: {e}")
+            
+            if attempt == retries - 1:
+                return None
+            
+            time.sleep(2)
+    return None

@@ -6,7 +6,7 @@ import json
 import os
 from utils import log
 import utils
-from curl_cffi import requests
+# from curl_cffi import requests
 
 redisClient = redis.Redis(
     host=os.getenv('REDIS_HOST', 'uth_redis'), 
@@ -37,12 +37,7 @@ def loginAndSaveToken(chatId, user, password):
     try:
         fakeCaptcha = utils.generateFakeCaptcha()
         url = f"https://portal.ut.edu.vn/api/v1/user/login?g-recaptcha-response={fakeCaptcha}"
-        r = requests.post(
-            url, 
-            json={"username": user, "password": password}, 
-            impersonate="chrome110",
-            timeout=15
-        )
+        r = utils.safeRequest("POST", url, json={"username": user, "password": password})
         data = r.json()
         token = data.get("token")
 

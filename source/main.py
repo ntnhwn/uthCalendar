@@ -20,14 +20,12 @@ def runScheduler():
 
 if __name__ == "__main__":
     db.initDb()
+
     task.updateWeatherTask.delay()
+    
     teleBot.registerHandlers(bot)
     threading.Thread(target=runScheduler, daemon=True).start()
+
+    bot.infinity_polling(timeout=20, long_polling_timeout=5)
     log("SYSTEM", "Bot UTH v2.1.4 (Multi-Task & Dict-based) đã sẵn sàng!")
     
-    while True:
-        try:
-            bot.polling(non_stop=True, timeout=20)
-        except Exception as e:
-            log("ERROR", f"Polling Error: {e}")
-            time.sleep(5)

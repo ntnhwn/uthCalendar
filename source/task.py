@@ -124,7 +124,7 @@ def updateWeatherTask():
     for code, coords in campuses.items():
         try:
             url = f"https://api.weatherapi.com/v1/forecast.json?key={WEATHER_API_KEY}&q={coords}&days=2&lang=vi"
-            response = utils.safeRequest("GET", url)
+            response = utils.safeRequest("GET", url, use_proxy=False)
             
             if response and response.status_code == 200:
                 data = response.json() 

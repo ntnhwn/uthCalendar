@@ -27,7 +27,6 @@ def getClassesByDate(chatId, user, password, targetDate):
         
         dateObj = datetime.strptime(targetDate, "%d/%m/%Y")
         isoDate = dateObj.strftime("%Y-%m-%d")
-        searchDate = targetDate
         
         headers = {
             "authorization": f"Bearer {tk}",
@@ -47,8 +46,7 @@ def getClassesByDate(chatId, user, password, targetDate):
             headers["authorization"] = f"Bearer {tk}"
             url = f"https://portal.ut.edu.vn/api/v1/lichhoc/lichTuan?date={isoDate}"
             res = utils.safeRequest("GET", url, headers=headers)
-            
-        body = res.json().get("body", [])
+
         
         if res.status_code == 200:
             data = res.json().get("body", [])
@@ -58,7 +56,7 @@ def getClassesByDate(chatId, user, password, targetDate):
         return False, f"Lỗi không xác định từ server trường (Mã: {res.status_code})"
     
     except Exception as e:
-        print(f"Lỗi quét lịch: {e}")
+        utils.log("ERROR", f"Lỗi getClassesByDate: {e}")
         return False, f"Lỗi hệ thống không xác định. Vui lòng thử lại sau ít phút."
 
 def verifyAndSaveUser(chatId, mssv, password):
